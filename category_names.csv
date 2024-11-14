@@ -1,0 +1,51 @@
+category_id,name,language_iso_639_1
+11,Space Opéra,fr
+12,Aventure,fr
+13,Conte fantastique,fr
+14,Fantastique,fr
+16,Animation,fr
+17,Film familial,fr
+18,Drame,fr
+19,Drame romantique,fr
+22,Musical,fr
+27,Horreur,fr
+28,Action,fr
+31,Film de guerre,fr
+32,Film anti-guerre,fr
+33,Romance,fr
+35,Comédie,fr
+36,Film historique,fr
+37,Western,fr
+43,Utopie & Contre-utopie,fr
+44,Drame social,fr
+71,Drame familial,fr
+72,Film de danse,fr
+80,Film policier,fr
+81,Arts martiaux,fr
+82,Cinéma asiatique,fr
+92,Drame politique,fr
+99,Documentaire,fr
+105,Film catastrophe,fr
+121,Screwball comedy,fr
+122,Comédie dramatique,fr
+126,Comédie romantique,fr
+130,Melodrame,fr
+133,Saga familiale,fr
+134,Drame judiciaire,fr
+138,Film militaire,fr
+141,Thriller psychologique,fr
+142,Thriller érotique,fr
+147,Film de cape et d'épée,fr
+148,Péplum,fr
+151,High Fantasy,fr
+154,Fantasy urbaine,fr
+190,Western classique,fr
+191,Western Spaghetti,fr
+249,Film de Mafia,fr
+252,Film de Yakuza,fr
+301,Film noir et blanc,fr
+354,Film expérimental,fr
+878,Science-fiction,fr
+2890,Film biographique,fr
+2916,Film érotique,fr
+10107,Film de sport,fr

@@ -1,0 +1,63 @@
+job_id,name,language_iso_639_1
+1,Département écriture,fr
+2,Département production,fr
+3,Département réalisation,fr
+4,Acteurs,fr
+5,Département image,fr
+7,Département son,fr
+10,Département montage,fr
+13,Auteur,fr
+14,Autre (Département écriture),fr
+15,Acteur,fr
+16,Producteur,fr
+17,Casting,fr
+21,Réalisateur,fr
+22,Autre (Département réalisation),fr
+23,Directeur de la photographie,fr
+33,Monteur,fr
+40,Producteur exécutif,fr
+41,Co-Producteur,fr
+43,Producteur associé,fr
+68,Special Guest Réalisateur,fr
+100,Scénario,fr
+103,Roman,fr
+104,Histoire,fr
+111,Personnages,fr
+138,Théâtre,fr
+207,Premier Assistant Réalisateur,fr
+209,Idée,fr
+216,Premier assistant de production,fr
+217,Second assistant de production,fr
+218,Superviseur de la production,fr
+235,Superviseur script,fr
+238,Assistant de production,fr
+239,Second Assistant Réalisateur,fr
+240,Second Assistant Réalisateur,fr
+241,Troisième Assistant Réalisateur,fr
+243,Assistant réalisateur aditionnel,fr
+258,Producteur créatif,fr
+267,Voix,fr
+297,Doublure,fr
+298,Consultant exécutif,fr
+300,Co-Réalisateur,fr
+301,Histoire originelle,fr
+321,Storyboard aditionnel,fr
+322,Additional Screenplay Material,fr
+324,Coordinateur script,fr
+360,Premier assistant au montage,fr
+365,Coordination montage,fr
+419,Auteur de scénario,fr
+423,Character Technical Supervisor,fr
+446,Monteur dialogue,fr
+469,Script,fr
+476,Producteur assistant,fr
+477,Roman graphique,fr
+500,Assistant de l'auteur,fr
+520,Executif en charge de la production,fr
+521,Executif en charge de la  post-production,fr
+639,Administration,fr
+658,Musicien,fr
+749,Opéra,fr
+772,Créateur,fr
+824,Narrateur,fr
+826,Personne montrée,fr
