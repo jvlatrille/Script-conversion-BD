@@ -438,5 +438,6 @@ target_cursor.close()
 target_conn.close()
 
 print(
-    "Transfert terminé avec descriptions, durées, notes, langues, genres, personnes, collaborations et collections associés !"
+    "Fini :)"
 )
+
