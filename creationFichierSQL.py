@@ -51,6 +51,8 @@ target_conn.close()
 print("Prêt pour l'insertion : vhs.sql exécuté, insertion.sql mis à jour.")
 
 
+
+
 # Fonction pour transférer les données de 'all_movies.csv' vers 'vhs_OA' avec descriptions, durées, notes et langues
 def transfer_oa():
     try:
