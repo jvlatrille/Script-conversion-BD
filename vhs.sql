@@ -1,3 +1,6 @@
+CREATE DATABASE IF NOT EXISTS testbdvhs;
+USE testbdvhs;
+
 -- Suppression des tables dans l'ordre des dépendances
 DROP TABLE IF EXISTS vhs_porterSur;
 DROP TABLE IF EXISTS vhs_fairePartie;
