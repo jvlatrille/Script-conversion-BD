@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS testbdvhs;
-USE testbdvhs;
+CREATE DATABASE IF NOT EXISTS namrein_pro;
+USE namrein_pro;
 
 -- Suppression des tables dans l'ordre des dépendances
 DROP TABLE IF EXISTS vhs_porterSur;
