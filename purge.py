@@ -1,443 +1,139 @@
 import os
 import pandas as pd
-import mysql.connector
 
-# Connexion à la base cible "testbdvhs"
-target_conn = mysql.connector.connect(
-    host="localhost", user="root", password="", database="testbdvhs"
-)
+# Dossier contenant les fichiers CSV
+directory = "."
 
+# Mapping des colonnes d'identifiant par fichier
+id_columns_map = {
+    "all_casts.csv": ["movie_id", "person_id", "job_id"],
+    "all_categories.csv": ["id", "parent_id", "root_id"],
+    "all_characters.csv": ["id"],
+    "all_episodes.csv": ["id", "parent_id", "series_id"],
+    "all_games.csv": ["id", "parent_id"],
+    "all_movie_aliases_iso.csv": ["movie_id"],
+    "all_movies.csv": ["id", "parent_id"],
+    "all_movieseries.csv": ["id", "parent_id"],
+    "all_people_aliases.csv": ["person_id"],
+    "all_people.csv": ["id"],
+    "all_seasons.csv": ["id", "parent_id"],
+    "all_series.csv": ["id", "parent_id"],
+    "all_votes.csv": ["movie_id"],
+    "category_names.csv": ["category_id"],
+    "image_ids.csv": ["image_id", "object_id"],
+    "image_licenses.csv": ["image_id"],
+    "job_names.csv": ["job_id"],
+    "movie_abstracts_fr.csv": ["movie_id"],
+    "movie_categories.csv": ["movie_id", "category_id"],
+    "movie_content_updates.csv": ["movie_id"],
+    "movie_countries.csv": ["movie_id"],
+    "movie_details.csv": ["movie_id"],
+    "movie_keywords.csv": ["movie_id", "category_id"],
+    "movie_languages.csv": ["movie_id"],
+    "movie_links.csv": ["movie_id"],
+    "movie_references.csv": ["movie_id", "referenced_id"],
+    "people_links.csv": ["movie_id"],
+    "trailers.csv": ["movie_id"],
+}
 
-# Exécuter le fichier SQL pour créer les tables dans la base cible
-def execute_sql_file(filename, connection):
-    with open(filename, "r") as file:
-        sql_script = file.read()
-    cursor = connection.cursor()
-    for statement in sql_script.split(";"):
-        if statement.strip():
-            try:
-                cursor.execute(statement)
-            except mysql.connector.Error as err:
-                print(f"Erreur lors de l'exécution de la commande SQL : {err}")
-    connection.commit()
-    print(f"Script {filename} exécuté avec succès !")
-    cursor.close()
+# Fonction pour purger les CSV avec une suppression en cascade
+def purge_csv_files():
+    # Dictionnaire pour stocker les IDs à supprimer par colonne d'identifiant
+    ids_to_remove = {col: set() for columns in id_columns_map.values() for col in columns}
 
+    # Première passe : identifier les IDs avec des valeurs nulles
+    for filename, id_columns in id_columns_map.items():
+        filepath = os.path.join(directory, filename)
+        if not os.path.isfile(filepath):
+            continue
 
-execute_sql_file("vhs.sql", target_conn)
+        # Chargement du fichier CSV
+        df = pd.read_csv(filepath, encoding="utf-8", on_bad_lines="skip")
 
-target_cursor = target_conn.cursor()
+        # Vérifier pour chaque colonne d'identifiant
+        for id_col in id_columns:
+            if id_col in df.columns:
+                null_rows = df[id_col].isin(['\\N', None, ''])
+                ids_to_remove[id_col].update(df.loc[null_rows, id_col].dropna().tolist())
+                # Supprime les lignes avec des valeurs nulles dans cette colonne d'identifiant
+                df = df[~null_rows]
 
+        # Sauvegarde temporaire (on réécrira encore après la deuxième passe)
+        df.to_csv(filepath, index=False)
 
-# Fonction pour transférer les données de 'all_movies.csv' vers 'vhs_OA' avec descriptions, durées, notes et langues
-def transfer_oa():
-    try:
-        movies_df = pd.read_csv("all_movies.csv", encoding="utf-8", on_bad_lines="skip")
-        episodes_df = pd.read_csv(
-            "all_episodes.csv", encoding="utf-8", on_bad_lines="skip"
-        )
-        abstracts_df = pd.read_csv(
-            "movie_abstracts_fr.csv", encoding="utf-8", on_bad_lines="skip"
-        )
-        details_df = pd.read_csv(
-            "movie_details.csv", encoding="utf-8", on_bad_lines="skip"
-        )
-        votes_df = pd.read_csv("all_votes.csv", encoding="utf-8", on_bad_lines="skip")
-        languages_df = pd.read_csv(
-            "movie_languages.csv", encoding="utf-8", on_bad_lines="skip"
-        )
-    except pd.errors.ParserError as e:
-        print(f"Erreur lors de la lecture d'un fichier CSV : {e}")
-        return
+    # Deuxième passe : supprimer toutes les références aux IDs incomplets dans les autres fichiers
+    for filename, id_columns in id_columns_map.items():
+        filepath = os.path.join(directory, filename)
+        if not os.path.isfile(filepath):
+            continue
 
-    # Fusion des informations supplémentaires pour les films
-    merged_movies_df = pd.merge(
-        movies_df, abstracts_df, how="left", left_on="id", right_on="movie_id"
-    )
-    merged_movies_df = pd.merge(
-        merged_movies_df, details_df, how="left", left_on="id", right_on="movie_id"
-    )
-    merged_movies_df = pd.merge(
-        merged_movies_df, votes_df, how="left", left_on="id", right_on="movie_id"
-    )
-    languages_dict = (
-        languages_df.drop_duplicates(subset=["movie_id"])
-        .set_index("movie_id")["language_iso_639_1"]
-        .to_dict()
-    )
-    merged_movies_df["language_iso_639_1"] = merged_movies_df["id"].map(languages_dict)
+        # Charger le fichier CSV
+        df = pd.read_csv(filepath, encoding="utf-8", on_bad_lines="skip")
+        
+        # Vérifie les colonnes pour les références d'IDs et supprime les lignes qui contiennent des IDs à supprimer
+        for col in id_columns:
+            if col in df.columns and col in ids_to_remove:
+                df = df[~df[col].isin(ids_to_remove[col])]
+        
+        # Sauvegarde finale du fichier purgé
+        df.to_csv(filepath, index=False)
 
-    # Insertion groupée des films dans la base de données
-    oa_data = []
-    for _, row in merged_movies_df.iterrows():
-        id_oa = row["id"]
-        nom = row["name"]
-        date_sortie = row["date"]
-        description = (
-            row["abstract"]
-            if pd.notna(row["abstract"])
-            else "Description non disponible"
-        )
-        duree = row["runtime"] if pd.notna(row["runtime"]) else None
-        note = row["vote_average"] if pd.notna(row["vote_average"]) else None
-        vo = (
-            row["language_iso_639_1"]
-            if pd.notna(row["language_iso_639_1"])
-            else "Langue non spécifiée"
-        )
+    print("Purge des CSV terminée avec suppression en cascade !")
 
-        oa_data.append((id_oa, nom, "Film", description, date_sortie, duree, note, vo))
+# Nettoyage des collections vides
+def clean_empty_collections():
+    filepath = os.path.join(directory, "all_categories.csv")
+    if os.path.isfile(filepath):
+        df = pd.read_csv(filepath, encoding="utf-8", on_bad_lines="skip")
+        
+        # Supprimer les collections sans parent ou enfants
+        linked_ids = set(df["id"]).intersection(set(df["parent_id"].dropna()))
+        df = df[df["id"].isin(linked_ids) | df["parent_id"].notna()]
+        
+        df.to_csv(filepath, index=False)
+        print("Nettoyage des collections vides terminé !")
 
-    # Insertion des films
-    try:
-        target_cursor.executemany(
-            """
-            INSERT IGNORE INTO vhs_OA (idOA, nom, type, description, dateSortie, duree, note, vo)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            oa_data,
-        )
-        target_conn.commit()
-        print("Films insérés avec succès.")
-    except mysql.connector.Error as err:
-        print(f"Erreur lors de l'insertion des films : {err}")
+# Nettoyage des personnes non liées
+def clean_unused_people():
+    people_file = os.path.join(directory, "all_people.csv")
+    casts_file = os.path.join(directory, "all_casts.csv")
+    if os.path.isfile(people_file) and os.path.isfile(casts_file):
+        people_df = pd.read_csv(people_file, encoding="utf-8", on_bad_lines="skip")
+        casts_df = pd.read_csv(casts_file, encoding="utf-8", on_bad_lines="skip")
+        
+        # Récupérer les IDs des personnes utilisées dans les castings
+        used_people_ids = set(casts_df["person_id"])
+        people_df = people_df[people_df["id"].isin(used_people_ids)]
+        
+        people_df.to_csv(people_file, index=False)
+        print("Nettoyage des personnes non liées terminé !")
 
-    # --- Insertion des séries et épisodes ---
-    merged_episodes_df = pd.merge(
-        episodes_df, abstracts_df, how="left", left_on="id", right_on="movie_id"
-    )
-    merged_episodes_df = pd.merge(
-        merged_episodes_df, details_df, how="left", left_on="id", right_on="movie_id"
-    )
-    merged_episodes_df = pd.merge(
-        merged_episodes_df, votes_df, how="left", left_on="id", right_on="movie_id"
-    )
-    merged_episodes_df["language_iso_639_1"] = merged_episodes_df["id"].map(
-        languages_dict
-    )
+# Suppression des films avec des notes nulles
+def clean_movies_with_null_notes():
+    votes_file = os.path.join(directory, "all_votes.csv")
+    if os.path.isfile(votes_file):
+        votes_df = pd.read_csv(votes_file, encoding="utf-8", on_bad_lines="skip")
 
-    oa_data_series = []
-    for _, row in merged_episodes_df.iterrows():
-        id_oa = row["id"]
-        nom = row["name"]
-        date_sortie = row["date"]
-        description = (
-            row["abstract"]
-            if pd.notna(row["abstract"])
-            else "Description non disponible"
-        )
-        duree = row["runtime"] if pd.notna(row["runtime"]) else 40
-        note = row["vote_average"] if pd.notna(row["vote_average"]) else None
-        vo = (
-            row["language_iso_639_1"]
-            if pd.notna(row["language_iso_639_1"])
-            else "Langue non spécifiée"
-        )
+        # Identifier les films avec des notes nulles
+        null_votes = votes_df["vote_average"].isnull()
+        null_movie_ids = votes_df.loc[null_votes, "movie_id"].tolist()
 
-        oa_data_series.append(
-            (id_oa, nom, "Série", description, date_sortie, duree, note, vo)
-        )
+        # Supprimer les lignes des fichiers liés
+        for filename, id_columns in id_columns_map.items():
+            filepath = os.path.join(directory, filename)
+            if not os.path.isfile(filepath):
+                continue
 
-    try:
-        target_cursor.executemany(
-            """
-            INSERT IGNORE INTO vhs_OA (idOA, nom, type, description, dateSortie, duree, note, vo)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """,
-            oa_data_series,
-        )
-        target_conn.commit()
-        print("Épisodes insérés avec succès.")
-    except mysql.connector.Error as err:
-        print(f"Erreur lors de l'insertion des épisodes : {err}")
+            df = pd.read_csv(filepath, encoding="utf-8", on_bad_lines="skip")
+            if "movie_id" in id_columns and "movie_id" in df.columns:
+                df = df[~df["movie_id"].isin(null_movie_ids)]
 
-    print("Transfert des données de films et d'épisodes vers 'vhs_OA' terminé !")
+            df.to_csv(filepath, index=False)
+        
+        print("Nettoyage des films avec des notes nulles terminé !")
 
-
-def transfer_tags():
-    try:
-        category_names_df = pd.read_csv(
-            "category_names.csv", encoding="utf-8", on_bad_lines="skip"
-        )
-    except pd.errors.ParserError as e:
-        print(f"Erreur lors de la lecture du fichier CSV : {e}")
-        return
-
-    tags_data = []
-    for _, row in category_names_df.iterrows():
-        id_tag = row["category_id"]
-        nom = row["name"]
-
-        tags_data.append((id_tag, nom))
-
-    try:
-        target_cursor.executemany(
-            """
-            INSERT IGNORE INTO vhs_Tags (idTag, nom)
-            VALUES (%s, %s)
-            """,
-            tags_data,
-        )
-        target_conn.commit()
-        print("Tags insérés avec succès.")
-    except mysql.connector.Error as err:
-        print(f"Erreur lors de l'insertion des tags : {err}")
-
-
-def associate_tags_with_oa():
-    try:
-        # Lire le fichier movie_categories.csv pour les liens entre movie_id et category_id
-        movie_categories_df = pd.read_csv(
-            "movie_categories.csv", encoding="utf-8", on_bad_lines="skip"
-        )
-    except pd.errors.ParserError as e:
-        print(f"Erreur lors de la lecture du fichier CSV : {e}")
-        return
-
-    # Préparer les données pour les associations en convertissant les IDs en int (types Python standards)
-    associations_data = []
-    for _, row in movie_categories_df.iterrows():
-        movie_id = int(row["movie_id"])  # Conversion en int
-        category_id = int(row["category_id"])  # Conversion en int
-
-        associations_data.append((category_id, movie_id))
-
-    # Insérer les associations dans la table vhs_posseder
-    try:
-        target_cursor.executemany(
-            """
-            INSERT IGNORE INTO vhs_posseder (idTag, idOA)
-            VALUES (%s, %s)
-            """,
-            associations_data,
-        )
-        target_conn.commit()
-        print("Associations des tags aux OA insérées avec succès.")
-    except mysql.connector.Error as err:
-        print(f"Erreur lors de l'insertion des associations : {err}")
-
-
-# Fonction pour transférer les personnes de 'all_people.csv' vers 'vhs_Personne'
-def transfer_people():
-    try:
-        # Lire le fichier CSV des personnes
-        people_df = pd.read_csv("all_people.csv", encoding="utf-8", on_bad_lines="skip")
-    except pd.errors.ParserError as e:
-        print(f"Erreur lors de la lecture du fichier CSV : {e}")
-        return
-
-    # Préparer les données pour l'insertion
-    people_data = []
-    for _, row in people_df.iterrows():
-        id_personne = row["id"]
-        nom = row["name"].split()[-1] if " " in row["name"] else row["name"]
-        prenom = row["name"].split()[0] if " " in row["name"] else None
-        date_naiss = row["birthday"] if pd.notna(row["birthday"]) else None
-        people_data.append((id_personne, nom, prenom, date_naiss))
-
-    # Insérer les données dans la table vhs_Personne
-    try:
-        target_cursor.executemany(
-            """
-            INSERT INTO vhs_Personne (idPersonne, nom, prenom, dateNaiss)
-            VALUES (%s, %s, %s, %s)
-            """,
-            people_data,
-        )
-        target_conn.commit()
-        print("Transfert des données de 'all_people.csv' vers 'vhs_Personne' terminé !")
-    except mysql.connector.Error as err:
-        print(f"Erreur lors de l'insertion des personnes : {err}")
-
-
-def transfer_collaborations():
-    try:
-        # Charger les fichiers CSV
-        collaborations_df = pd.read_csv(
-            "all_casts.csv", encoding="utf-8", on_bad_lines="skip"
-        )
-        job_names_df = pd.read_csv(
-            "job_names.csv", encoding="utf-8", on_bad_lines="skip"
-        )
-    except pd.errors.ParserError as e:
-        print(f"Erreur lors de la lecture d'un fichier CSV : {e}")
-        return
-
-    # Créer un dictionnaire pour lier chaque job_id à son nom
-    job_names_dict = job_names_df.set_index("job_id")["name"].to_dict()
-
-    collaboration_data = []
-
-    for _, row in collaborations_df.iterrows():
-        id_oa = row["movie_id"]
-        id_personne = row["person_id"]
-        job_id = row["job_id"]
-
-        # Utiliser le dictionnaire pour trouver le rôle, ou définir "Inconnu" si le job_id n'existe pas
-        role = job_names_dict.get(job_id, "Inconnu")
-        rang = row["position"] if "position" in row else None
-
-        # Ajouter les données de collaboration
-        collaboration_data.append((id_personne, id_oa, role, rang))
-
-    # Insérer les collaborations dans la base de données
-    try:
-        target_cursor.executemany(
-            """
-            INSERT IGNORE INTO vhs_collaborer (idPersonne, idOA, role, rang)
-            VALUES (%s, %s, %s, %s)
-            """,
-            collaboration_data,
-        )
-        target_conn.commit()
-        print("Transfert des collaborations vers 'vhs_collaborer' terminé !")
-    except mysql.connector.Error as err:
-        print(f"Erreur lors de l'insertion des collaborations : {err}")
-
-
-def transfer_collections():
-    try:
-        # Charger les fichiers CSV
-        sagas_df = pd.read_csv(
-            "all_movieseries.csv", encoding="utf-8", on_bad_lines="skip"
-        )
-        series_df = pd.read_csv("all_series.csv", encoding="utf-8", on_bad_lines="skip")
-        seasons_df = pd.read_csv(
-            "all_seasons.csv", encoding="utf-8", on_bad_lines="skip"
-        )
-        episodes_df = pd.read_csv(
-            "all_episodes.csv", encoding="utf-8", on_bad_lines="skip"
-        )
-    except pd.errors.ParserError as e:
-        print(f"Erreur lors de la lecture d'un fichier CSV : {e}")
-        return
-
-    # Transfert des Sagas
-    saga_data = []
-    for _, row in sagas_df.iterrows():
-        saga_data.append((row["id"], row["name"], "Saga"))
-
-    try:
-        target_cursor.executemany(
-            """
-            INSERT IGNORE INTO vhs_collection (idCollection, nom, type)
-            VALUES (%s, %s, %s)
-            """,
-            saga_data,
-        )
-        target_conn.commit()
-        print("Sagas insérées avec succès.")
-    except mysql.connector.Error as err:
-        print(f"Erreur lors de l'insertion des sagas : {err}")
-
-    # Transfert des Séries et mise à jour des relations avec les Sagas
-    series_data = []
-    series_relations = []
-    for _, row in series_df.iterrows():
-        series_data.append((row["id"], row["name"], "Série"))
-        if pd.notna(row["parent_id"]):
-            series_relations.append((row["parent_id"], row["id"]))
-
-    try:
-        target_cursor.executemany(
-            """
-            INSERT IGNORE INTO vhs_collection (idCollection, nom, type)
-            VALUES (%s, %s, %s)
-            """,
-            series_data,
-        )
-        # Mise à jour des relations parent-enfant pour les séries
-        target_cursor.executemany(
-            """
-            UPDATE vhs_collection
-            SET idCollectionParent = %s
-            WHERE idCollection = %s
-            """,
-            series_relations,
-        )
-        target_conn.commit()
-        print("Séries et relations avec les Sagas insérées avec succès.")
-    except mysql.connector.Error as err:
-        print(f"Erreur lors de l'insertion des séries ou des relations : {err}")
-
-    # Transfert des Saisons et mise à jour des relations avec les Séries
-    seasons_data = []
-    seasons_relations = []
-    for _, row in seasons_df.iterrows():
-        seasons_data.append((row["id"], row["name"], "Saison"))
-        if pd.notna(row["parent_id"]):
-            seasons_relations.append((row["parent_id"], row["id"]))
-
-    try:
-        target_cursor.executemany(
-            """
-            INSERT IGNORE INTO vhs_collection (idCollection, nom, type)
-            VALUES (%s, %s, %s)
-            """,
-            seasons_data,
-        )
-        # Mise à jour des relations parent-enfant pour les saisons
-        target_cursor.executemany(
-            """
-            UPDATE vhs_collection
-            SET idCollectionParent = %s
-            WHERE idCollection = %s
-            """,
-            seasons_relations,
-        )
-        target_conn.commit()
-        print("Saisons et relations avec les Séries insérées avec succès.")
-    except mysql.connector.Error as err:
-        print(f"Erreur lors de l'insertion des saisons ou des relations : {err}")
-
-    # Transfert des Épisodes et mise à jour des relations avec les Saisons
-    episodes_data = []
-    episodes_relations = []
-    for _, row in episodes_df.iterrows():
-        episodes_data.append((row["id"], row["name"], "Épisode"))
-        if pd.notna(row["parent_id"]):
-            episodes_relations.append((row["parent_id"], row["id"]))
-
-    try:
-        target_cursor.executemany(
-            """
-            INSERT IGNORE INTO vhs_collection (idCollection, nom, type)
-            VALUES (%s, %s, %s)
-            """,
-            episodes_data,
-        )
-        # Mise à jour des relations parent-enfant pour les épisodes
-        target_cursor.executemany(
-            """
-            UPDATE vhs_collection
-            SET idCollectionParent = %s
-            WHERE idCollection = %s
-            """,
-            episodes_relations,
-        )
-        target_conn.commit()
-        print("Épisodes et relations avec les Saisons insérés avec succès.")
-    except mysql.connector.Error as err:
-        print(f"Erreur lors de l'insertion des épisodes ou des relations : {err}")
-
-    print(
-        "Transfert des collections (sagas, séries, saisons, épisodes) et relations terminé !"
-    )
-
-
-# Appel des fonctions pour transférer les données vers les tables appropriées
-transfer_oa()
-transfer_tags()
-associate_tags_with_oa()
-transfer_people()
-transfer_collaborations()
-transfer_collections()
-
-# Fermeture des connexions
-target_cursor.close()
-target_conn.close()
-
-print(
-    "Fini :)"
-)
-
+# Appel des fonctions
+purge_csv_files()
+clean_empty_collections()
+clean_unused_people()
+clean_movies_with_null_notes()

@@ -73,11 +73,10 @@ def transfer_oa():
         id_oa = row["id"]
         nom = row["name"]
         date_sortie = row["date"]
-        description = (
-            row["abstract"]
-            if pd.notna(row["abstract"])
-            else "Description non disponible"
-        )
+        # Si aucune description n'est présente, la ligne est ignorée
+        # if pd.isna(row["abstract"]):
+        #     continue
+        description = row["abstract"]
         duree = row["runtime"] if pd.notna(row["runtime"]) else None
         note = row["vote_average"] if pd.notna(row["vote_average"]) else None
         vo = (
@@ -103,6 +102,7 @@ def transfer_oa():
         print(f"Erreur lors de l'insertion des films : {err}")
 
     # --- Insertion des séries et épisodes ---
+
     merged_episodes_df = pd.merge(
         episodes_df, abstracts_df, how="left", left_on="id", right_on="movie_id"
     )
@@ -121,11 +121,10 @@ def transfer_oa():
         id_oa = row["id"]
         nom = row["name"]
         date_sortie = row["date"]
-        description = (
-            row["abstract"]
-            if pd.notna(row["abstract"])
-            else "Description non disponible"
-        )
+        # Si aucune description n'est présente, la ligne est ignorée
+        if pd.isna(row["abstract"]):
+            continue
+        description = row["abstract"]
         duree = row["runtime"] if pd.notna(row["runtime"]) else 40
         note = row["vote_average"] if pd.notna(row["vote_average"]) else None
         vo = (
@@ -147,11 +146,11 @@ def transfer_oa():
             oa_data_series,
         )
         target_conn.commit()
-        print("Épisodes insérés avec succès.")
+        print("Séries insérées avec succès.")
     except mysql.connector.Error as err:
-        print(f"Erreur lors de l'insertion des épisodes : {err}")
+        print(f"Erreur lors de l'insertion des séries : {err}")
 
-    print("Transfert des données de films et d'épisodes vers 'vhs_OA' terminé !")
+    print("Transfert des données des séries et des épisodes vers 'vhs_OA' terminé !")
 
 
 def transfer_tags():
@@ -433,11 +432,88 @@ transfer_people()
 transfer_collaborations()
 transfer_collections()
 
+print("Fini :)")
+
+# Suppression des OA avec des notes nulles
+# try:
+#     target_cursor.execute(
+#         """
+#         UPDATE vhs_OA
+#         SET note = FLOOR(4 + RAND() * 6)
+#         WHERE note IS NULL;
+#         """
+#     )
+#     target_conn.commit()
+#     print("Suppression des OA avec des notes nulles terminée.")
+# except mysql.connector.Error as err:
+#     print(f"Erreur lors de la suppression des OA avec des notes nulles : {err}")
+
+# # Suppression des collaborations sans OA associée
+# try:
+#     target_cursor.execute(
+#         """
+#         DELETE FROM vhs_collaborer
+#         WHERE idOA NOT IN (SELECT idOA FROM vhs_OA);
+#         """
+#     )
+#     target_conn.commit()
+#     print("Collaborations sans OA associée supprimées.")
+# except mysql.connector.Error as err:
+#     print(f"Erreur lors de la suppression des collaborations sans OA associée : {err}")
+
+# # Suppression des tags dans 'vhs_posseder' sans OA associée
+# try:
+#     target_cursor.execute(
+#         """
+#         DELETE FROM vhs_posseder
+#         WHERE idOA NOT IN (SELECT idOA FROM vhs_OA);
+#         """
+#     )
+#     target_conn.commit()
+#     print("Tags sans OA associée supprimés.")
+# except mysql.connector.Error as err:
+#     print(f"Erreur lors de la suppression des tags sans OA associée : {err}")
+
+# # Suppression des collections sans OA associée
+# try:
+#     target_cursor.execute(
+#         """
+#         DELETE FROM vhs_collection
+#         WHERE idCollection NOT IN (SELECT idOA FROM vhs_OA);
+#         """
+#     )
+#     target_conn.commit()
+#     print("Collections sans OA associée supprimées.")
+# except mysql.connector.Error as err:
+#     print(f"Erreur lors de la suppression des collections sans OA associée : {err}")
+
+# # Suppression des participations sans OA associée
+# try:
+#     target_cursor.execute(
+#         """
+#         DELETE FROM vhs_participer
+#         WHERE idOA NOT IN (SELECT idOA FROM vhs_OA);
+#         """
+#     )
+#     target_conn.commit()
+#     print("Participations sans OA associée supprimées.")
+# except mysql.connector.Error as err:
+#     print(f"Erreur lors de la suppression des participations sans OA associée : {err}")
+
+# # Suppression des personnes non liées dans 'vhs_collaborer'
+# try:
+#     target_cursor.execute(
+#         """
+#         DELETE FROM vhs_personne
+#         WHERE idPersonne NOT IN (SELECT idPersonne FROM vhs_collaborer);
+#         """
+#     )
+#     target_conn.commit()
+#     print("Personnes non liées supprimées.")
+# except mysql.connector.Error as err:
+#     print(f"Erreur lors de la suppression des personnes non liées : {err}")
+
+
 # Fermeture des connexions
 target_cursor.close()
 target_conn.close()
-
-print(
-    "Fini :)"
-)
-
